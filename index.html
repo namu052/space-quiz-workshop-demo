@@ -35,9 +35,9 @@
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
-    button, input { font: inherit; }
+    button, input, textarea { font: inherit; }
     button { cursor: pointer; }
-    button:focus-visible, a:focus-visible, [tabindex="-1"]:focus-visible {
+    button:focus-visible, a:focus-visible, textarea:focus-visible, [tabindex="-1"]:focus-visible {
       outline: 3px solid var(--purple);
       outline-offset: 5px;
     }
@@ -146,6 +146,11 @@
     .result-score span { font-size: 20px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
     .result-stats { display: flex; justify-content: center; gap: 28px; margin: 18px 0 25px; font-size: 12px; color: var(--muted); }
     .result-stats strong { color: var(--ink); }
+    .mission-report { padding: 20px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface-soft); overflow-wrap: anywhere; }
+    .mission-report h3 { margin: 0 0 8px; font-size: 16px; }
+    .mission-report p { margin: 8px 0; font-size: 13px; }
+    .mission-report .timing-note, .copy-status { color: var(--muted); font-size: 12px; }
+    .copy-text { width: 100%; min-height: 140px; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
     .review { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 19px; text-align: left; }
     .review summary { cursor: pointer; color: var(--purple); font-size: 12px; font-weight: 700; padding: 5px; }
     .review summary:focus-visible { outline: 3px solid var(--purple); outline-offset: 3px; }
@@ -241,8 +246,18 @@
             <p class="eyebrow">MISSION COMPLETE</p>
             <h2 id="result-title" tabindex="-1"></h2>
             <p class="result-description" id="result-description"></p>
-            <div class="result-score" id="result-score"></div>
-            <div class="result-stats"><span>정답 <strong id="correct-total"></strong></span><span>정답률 <strong id="accuracy"></strong></span></div>
+            <section class="mission-report" aria-labelledby="mission-report-title">
+              <h3 id="mission-report-title">미션 리포트</h3>
+              <p id="report-grade"></p>
+              <div class="result-score" id="result-score"></div>
+              <div class="result-stats"><span>정답 <strong id="correct-total"></strong></span><span>정답률 <strong id="accuracy"></strong></span></div>
+              <p><strong>가장 오래 걸린 문항</strong></p>
+              <p id="slowest-question"></p>
+              <p class="timing-note">문항 표시부터 정답 확인까지 측정해요. 동률이면 먼저 출제된 문항을 표시해요.</p>
+              <button class="action" id="copy-report" type="button">미션 리포트 복사하기</button>
+              <p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+              <textarea class="copy-text" id="copy-text" aria-label="수동 복사용 미션 리포트" aria-describedby="copy-status" readonly hidden></textarea>
+            </section>
             <button class="action" id="restart" type="button">다시 탐사하기 <span aria-hidden="true">↻</span></button>
             <details class="review">
               <summary>탐사 기록과 정답 해설 보기</summary>
@@ -322,6 +337,9 @@
     let score = 0;
     let checked = false;
     const responses = [];
+    const responseTimes = [];
+    let questionStartedAt = 0;
+    let missionReportText = "";
 
     function updateProgress() {
       $("completed").textContent = responses.length;
@@ -362,6 +380,7 @@
         $("choices").append(label);
       });
       if (moveFocus) $("question").focus();
+      questionStartedAt = performance.now();
     }
 
     function checkAnswer() {
@@ -375,6 +394,7 @@
       const correct = choice === item.answer;
       checked = true;
       responses.push(choice);
+      responseTimes.push(performance.now() - questionStartedAt);
       if (correct) {
         score++;
         $("score-badge").classList.add("pop");
@@ -425,6 +445,12 @@
       $("result-score").replaceChildren(document.createTextNode(String(score)), outOf);
       $("correct-total").textContent = `${score} / 10`;
       $("accuracy").textContent = `${score * 10}%`;
+      const slowestIndex = responseTimes.reduce((longest, elapsed, index) =>
+        elapsed > responseTimes[longest] ? index : longest, 0);
+      const slowest = `${slowestIndex + 1}번 · ${runQuestions[slowestIndex].question} (${(responseTimes[slowestIndex] / 1000).toFixed(1)}초)`;
+      $("report-grade").textContent = `등급: ${result[1]}`;
+      $("slowest-question").textContent = slowest;
+      missionReportText = `ORBIT 미션 리포트\n점수: ${score} / 10점 · 정답률: ${score * 10}%\n등급: ${result[1]}\n가장 오래 걸린 문항: ${slowest}`;
       $("review-list").replaceChildren();
       runQuestions.forEach((item, index) => {
         const li = document.createElement("li");
@@ -442,6 +468,38 @@
       $("result-title").focus();
     }
 
+    $("copy-report").addEventListener("click", async () => {
+      const text = missionReportText;
+      $("copy-report").disabled = true;
+      $("copy-status").textContent = "";
+      $("copy-text").hidden = true;
+      try {
+        await navigator.clipboard.writeText(text);
+        if (missionReportText !== text) return;
+        $("copy-status").textContent = "미션 리포트를 클립보드에 복사했어요.";
+      } catch {
+        if (missionReportText !== text) return;
+        const field = $("copy-text");
+        field.value = text;
+        field.hidden = false;
+        field.focus();
+        field.select();
+        let copied = false;
+        try {
+          copied = document.execCommand("copy");
+        } catch {}
+        field.hidden = copied;
+        $("copy-status").textContent = copied
+          ? "미션 리포트를 클립보드에 복사했어요."
+          : "자동 복사가 제한되어 있어요. 선택된 리포트를 Ctrl+C 또는 ⌘C로 복사해 주세요.";
+      } finally {
+        if (missionReportText === text) {
+          $("copy-report").disabled = false;
+          if ($("copy-text").hidden) $("copy-report").focus();
+        }
+      }
+    });
+
     $("quiz-form").addEventListener("submit", (event) => {
       event.preventDefault();
       if (!checked) {
@@ -458,6 +516,12 @@
       current = 0;
       score = 0;
       responses.length = 0;
+      responseTimes.length = 0;
+      missionReportText = "";
+      $("copy-status").textContent = "";
+      $("copy-text").value = "";
+      $("copy-text").hidden = true;
+      $("copy-report").disabled = false;
       runQuestions = shuffledQuestions();
       updateProgress();
       $("result-screen").hidden = true;
