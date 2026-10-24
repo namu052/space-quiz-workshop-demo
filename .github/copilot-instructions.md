@@ -9,11 +9,11 @@
 ## 구조와 상태 흐름
 
 - 문서 앞부분의 `<style>`이 테마와 레이아웃을 정의하고, HTML이 퀴즈·결과 화면의 틀을 제공한다. 문서 끝의 일반 `<script>`가 문항 데이터, 상태, DOM 렌더링을 담당한다.
-- `questions`의 각 항목은 `category`, `question`, 4개 문자열의 `choices`, 0부터 시작하는 정답 인덱스 `answer`, `explanation`으로 구성된다. 문항은 배열 순서대로 출제한다.
-- `current`는 현재 문항 인덱스, `score`는 맞힌 개수, `checked`는 현재 문항의 채점 여부다. `responses`는 제출한 선택지 인덱스를 문항 순서대로 보관한다. 상태는 메모리에만 유지한다.
+- `questions`의 각 항목은 `category`, `question`, 4개 문자열의 `choices`, 0부터 시작하는 정답 인덱스 `answer`, `explanation`으로 구성된다. 원본 배열은 유지하며, 최초 진입과 재시작 때 Fisher–Yates 방식으로 `runQuestions`의 실행별 출제 순서를 만든다.
+- `current`는 현재 실행 순서의 문항 인덱스, `score`는 맞힌 개수, `checked`는 현재 문항의 채점 여부다. `responses`는 제출한 선택지 인덱스를 `runQuestions` 순서대로 보관한다. 상태는 메모리에만 유지한다.
 - `quiz-form`의 제출 이벤트는 `checkAnswer()` → 다음 `renderQuestion()` → 마지막 문항 이후 `showResults()`의 흐름을 제어한다. 선택 직후 자동으로 넘어가지 않으며, 첫 제출은 채점과 해설 표시, 두 번째 제출은 다음 화면 이동이다.
 - `checkAnswer()`는 선택지를 비활성화하고 응답·점수를 한 번 반영한다. `updateProgress()`의 진행률은 현재 문항 번호가 아니라 **제출한 문항 수**다.
-- `showResults()`는 `responses`와 원래 문항 데이터를 조합해 전체 복습 목록을 만든다. 재시작은 인덱스·점수·응답·진행률·복습 펼침 상태를 초기화한다.
+- `showResults()`는 `runQuestions`와 `responses`를 같은 인덱스로 조합해 실제 출제 순서의 전체 복습 목록을 만든다. 재시작은 새 출제 순서를 만들고 인덱스·점수·응답·진행률·복습 펼침 상태를 초기화한다.
 
 ## 변경 시 유지할 계약
 

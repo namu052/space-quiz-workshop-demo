@@ -308,6 +308,16 @@
       { category: "우주의 경계", question: "블랙홀의 ‘사건의 지평선’이란 무엇일까요?", choices: ["별이 새로 태어나는 표면", "시간이 완전히 사라지는 지점", "빛조차 밖으로 탈출할 수 없는 경계", "블랙홀을 둘러싼 단단한 껍질"], answer: 2, explanation: "사건의 지평선은 그 안쪽에서 나온 빛이나 신호가 바깥으로 도달할 수 없는 경계예요. 단단한 표면은 아니랍니다." }
     ];
     const $ = (id) => document.getElementById(id);
+    function shuffledQuestions(random = Math.random) {
+      const shuffled = questions.slice();
+      for (let index = shuffled.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+      }
+      return shuffled;
+    }
+
+    let runQuestions = shuffledQuestions();
     let current = 0;
     let score = 0;
     let checked = false;
@@ -320,9 +330,9 @@
     }
 
     function renderQuestion(moveFocus = true) {
-      const item = questions[current];
+      const item = runQuestions[current];
       checked = false;
-      $("question-number").textContent = `QUESTION ${String(current + 1).padStart(2, "0")} / ${questions.length}`;
+      $("question-number").textContent = `QUESTION ${String(current + 1).padStart(2, "0")} / ${runQuestions.length}`;
       $("category").textContent = item.category;
       $("question").textContent = item.question;
       $("answer-legend").textContent = item.question;
@@ -360,7 +370,7 @@
         $("quiz-form").reportValidity();
         return;
       }
-      const item = questions[current];
+      const item = runQuestions[current];
       const choice = Number(selected.value);
       const correct = choice === item.answer;
       checked = true;
@@ -393,14 +403,14 @@
       explanation.textContent = item.explanation;
       $("feedback").hidden = false;
       $("feedback").replaceChildren(title, explanation);
-      $("action-text").textContent = current === questions.length - 1 ? "탐사 결과 보기" : "다음 질문으로";
+      $("action-text").textContent = current === runQuestions.length - 1 ? "탐사 결과 보기" : "다음 질문으로";
       $("action").focus();
     }
 
     function showResults() {
       $("question-screen").hidden = true;
       $("result-screen").hidden = false;
-      const result = score === 10
+      const result = score === runQuestions.length
         ? ["🏆", "우주 지식 마스터!", "완벽한 탐사였어요. 당신의 호기심은 우주만큼 넓네요!"]
         : score >= 7
           ? ["🚀", "멋진 우주 탐험가!", "훌륭한 탐사였어요. 다음 목적지는 우주 지식 마스터!"]
@@ -416,7 +426,7 @@
       $("correct-total").textContent = `${score} / 10`;
       $("accuracy").textContent = `${score * 10}%`;
       $("review-list").replaceChildren();
-      questions.forEach((item, index) => {
+      runQuestions.forEach((item, index) => {
         const li = document.createElement("li");
         const title = document.createElement("strong");
         title.textContent = item.question;
@@ -436,7 +446,7 @@
       event.preventDefault();
       if (!checked) {
         checkAnswer();
-      } else if (current < questions.length - 1) {
+      } else if (current < runQuestions.length - 1) {
         current++;
         renderQuestion();
       } else {
@@ -448,6 +458,7 @@
       current = 0;
       score = 0;
       responses.length = 0;
+      runQuestions = shuffledQuestions();
       updateProgress();
       $("result-screen").hidden = true;
       $("result-screen").querySelector("details").open = false;
